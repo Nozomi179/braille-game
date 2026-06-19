@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>点字物理ゲーム</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        body { 
+            display: flex; flex-direction: column; align-items: center; 
+            background: linear-gradient(135deg, #e0f2f1, #b3e5fc); 
+            min-height: 100vh; font-family: sans-serif; margin: 0; 
+        }
+        #menu { margin-top: 10px; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+        .mode-btn { 
+            padding: 10px 20px; cursor: pointer; border: none; border-radius: 8px; 
+            background: #ffffff; color: #0277bd; font-weight: bold; 
+            box-shadow: 0 4px 0 #01579b; transition: all 0.1s ease; margin: 5px;
+        }
+        .mode-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #01579b; }
+        .mode-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #01579b; }
+        .mode-btn.selected { background: #0288d1; color: white; box-shadow: 0 4px 0 #01579b; }
+        .mode-btn.selected:active { transform: translateY(2px); box-shadow: 0 2px 0 #01579b; }
+        
+        #game-container { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
+        #start-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
+        canvas { background: #fff; border: 3px solid #0277bd; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        #high-score-display { font-size: 1.2em; color: #0288d1; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <button class="mode-btn selected" onclick="toggleMode('a', this)">ア行</button>
+        <button class="mode-btn" onclick="toggleMode('ka', this)">カ・ガ</button>
+        <button class="mode-btn" onclick="toggleMode('sa', this)">サ・ザ</button>
+        <button class="mode-btn" onclick="toggleMode('ta', this)">タ・ダ</button>
+        <button class="mode-btn" onclick="toggleMode('na', this)">ナ行</button>
+        <button class="mode-btn" onclick="toggleMode('ha', this)">ハ・バ・パ</button>
+        <button class="mode-btn" onclick="toggleMode('ma', this)">マ行</button>
+        <button class="mode-btn" onclick="toggleMode('ya', this)">ヤ行</button>
+        <button class="mode-btn" onclick="toggleMode('ra', this)">ラ行</button>
+        <button class="mode-btn" onclick="toggleMode('wa', this)">ワ行</button>
+    </div>
+    
+    <div id="game-container">
+        <div id="start-overlay">
+            <h2 id="msg">行を選んでSTART！</h2>
+            <div id="high-score-display">HIGH SCORE: 0</div>
+            <button class="mode-btn" onclick="startGame()">START</button>
+        </div>
+        <div id="game-canvas"></div>
+    </div>
+
+    <script>
+        let score = 0, combo = 0;
+        let highScore = localStorage.getItem('brailleHighScore') || 0;
+        document.getElementById('high-score-display').innerText = "HIGH SCORE: " + highScore;
+
+        const brailleMap = { 'ア':'\u2801', 'イ':'\u2803', 'ウ':'\u2809', 'エ':'\u280b', 'オ':'\u280a', 'カ':'\u2821', 'キ':'\u2823', 'ク':'\u2829', 'ケ':'\u282b', 'コ':'\u282a', 'ガ':'\u2810\u2821', 'ギ':'\u2810\u2823', 'グ':'\u2810\u2829', 'ゲ':'\u2810\u282b', 'ゴ':'\u2810\u282a', 'サ':'\u2831', 'シ':'\u2833', 'ス':'\u2839', 'セ':'\u283b', 'ソ':'\u283a', 'ザ':'\u2810\u2831', 'ジ':'\u2810\u2833', 'ズ':'\u2810\u2839', 'ゼ':'\u2810\u283b', 'ゾ':'\u2810\u283a', 'タ':'\u2815', 'チ':'\u2817', 'ツ':'\u281d', 'テ':'\u281f', 'ト':'\u281e', 'ダ':'\u2810\u2815', 'ヂ':'\u2810\u2817', 'ヅ':'\u2810\u281d', 'デ':'\u2810\u281f', 'ド':'\u2810\u281e', 'ナ':'\u2805', 'ニ':'\u2807', 'ヌ':'\u280d', 'ネ':'\u280f', 'ノ':'\u280e', 'ハ':'\u2825', 'ヒ':'\u2827', 'フ':'\u282d', 'ヘ':'\u282f', 'ホ':'\u282e', 'バ':'\u2810\u2825', 'ビ':'\u2810\u2827', 'ブ':'\u2810\u282d', 'ベ':'\u2810\u282f', 'ボ':'\u2810\u282e', 'パ':'\u2820\u2825', 'ピ':'\u2820\u2827', 'プ':'\u2820\u282d', 'ペ':'\u2820\u282f', 'ポ':'\u2820\u282e', 'マ':'\u2835', 'ミ':'\u2837', 'ム':'\u283d', 'メ':'\u283f', 'モ':'\u283e', 'ヤ':'\u280a', 'ユ':'\u282a', 'ヨ':'\u281a', 'ラ':'\u2812', 'リ':'\u2816', 'ル':'\u280d', 'レ':'\u2816', 'ロ':'\u2816', 'ワ':'\u2804', 'ヲ':'\u2814', 'ン':'\u2834' };
+        
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playCorrectSound() { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination); osc.frequency.value = 880; gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5); osc.start(); osc.stop(audioCtx.currentTime + 0.5); }
+
+        const { Engine, Render, Runner, Bodies, Composite, Events, Body } = Matter;
+        const engine = Engine.create(); engine.world.gravity.y = 0.08; 
+        const render = Render.create({ element: document.getElementById('game-canvas'), engine: engine, options: { width: 400, height: 500, wireframes: false, background: '#fcfcfc' } });
+        
+        let isGameStarted = false, marblesInBowl = [], activeModes = new Set(['a']), currentMarble = null, currentStep = 0;
+        let lockedKeys = { 'f': false, 'd': false, 's': false, 'j': false, 'k': false, 'l': false };
+        let remainingLetters = []; 
+        const modeBaseColors = { 'a': 0, 'ka': 40, 'sa': 80, 'ta': 120, 'na': 160, 'ha': 200, 'ma': 240, 'ya': 280, 'ra': 320, 'wa': 20 };
+        const brailleSteps = { 'ア': { steps: [{ f: true }] }, 'イ': { steps: [{ f: true, d: true }] }, 'ウ': { steps: [{ f: true, j: true }] }, 'エ': { steps: [{ f: true, d: true, j: true }] }, 'オ': { steps: [{ d: true, j: true }] }, 'カ': { steps: [{ f: true, l: true }] }, 'キ': { steps: [{ f: true, d: true, l: true }] }, 'ク': { steps: [{ f: true, j: true, l: true }] }, 'ケ': { steps: [{ f: true, d: true, j: true, l: true }] }, 'コ': { steps: [{ d: true, j: true, l: true }] }, 'ガ': { steps: [{ k: true }, { f: true, l: true }] }, 'ギ': { steps: [{ k: true }, { f: true, d: true, l: true }] }, 'グ': { steps: [{ k: true }, { f: true, j: true, l: true }] }, 'ゲ': { steps: [{ k: true }, { f: true, d: true, j: true, l: true }] }, 'ゴ': { steps: [{ k: true }, { d: true, j: true, l: true }] }, 'サ': { steps: [{ f: true, k: true, l: true }] }, 'シ': { steps: [{ f: true, d: true, k: true, l: true }] }, 'ス': { steps: [{ f: true, j: true, k: true, l: true }] }, 'セ': { steps: [{ f: true, d: true, j: true, k: true, l: true }] }, 'ソ': { steps: [{ d: true, j: true, k: true, l: true }] }, 'ザ': { steps: [{ k: true }, { f: true, k: true, l: true }] }, 'ジ': { steps: [{ k: true }, { f: true, d: true, k: true, l: true }] }, 'ズ': { steps: [{ k: true }, { f: true, j: true, k: true, l: true }] }, 'ゼ': { steps: [{ k: true }, { f: true, d: true, j: true, k: true, l: true }] }, 'ゾ': { steps: [{ k: true }, { d: true, j: true, k: true, l: true }] }, 'タ': { steps: [{ f: true, s: true, k: true }] }, 'チ': { steps: [{ f: true, d: true, s: true, k: true }] }, 'ツ': { steps: [{ f: true, s: true, j: true, k: true }] }, 'テ': { steps: [{ f: true, d: true, s: true, j: true, k: true }] }, 'ト': { steps: [{ d: true, s: true, j: true, k: true }] }, 'ダ': { steps: [{ k: true }, { f: true, s: true, k: true }] }, 'ヂ': { steps: [{ k: true }, { f: true, d: true, s: true, k: true }] }, 'ヅ': { steps: [{ k: true }, { f: true, s: true, j: true, k: true }] }, 'デ': { steps: [{ k: true }, { f: true, d: true, s: true, j: true, k: true }] }, 'ド': { steps: [{ k: true }, { d: true, s: true, j: true, k: true }] }, 'ナ': { steps: [{ f: true, s: true }] }, 'ニ': { steps: [{ f: true, d: true, s: true }] }, 'ヌ': { steps: [{ f: true, s: true, j: true }] }, 'ネ': { steps: [{ f: true, d: true, s: true, j: true }] }, 'ノ': { steps: [{ d: true, s: true, j: true }] }, 'ハ': { steps: [{ f: true, s: true, l: true }] }, 'ヒ': { steps: [{ f: true, d: true, s: true, l: true }] }, 'フ': { steps: [{ f: true, s: true, j: true, l: true }] }, 'ヘ': { steps: [{ f: true, d: true, s: true, j: true, l: true }] }, 'ホ': { steps: [{ d: true, s: true, j: true, l: true }] }, 'バ': { steps: [{ k: true }, { f: true, s: true, l: true }] }, 'ビ': { steps: [{ k: true }, { f: true, d: true, s: true, l: true }] }, 'ブ': { steps: [{ k: true }, { f: true, s: true, j: true, l: true }] }, 'ベ': { steps: [{ k: true }, { f: true, d: true, s: true, j: true, l: true }] }, 'ボ': { steps: [{ k: true }, { d: true, s: true, j: true, l: true }] }, 'パ': { steps: [{ l: true }, { f: true, s: true, l: true }] }, 'ピ': { steps: [{ l: true }, { f: true, d: true, s: true, l: true }] }, 'プ': { steps: [{ l: true }, { f: true, s: true, j: true, l: true }] }, 'ペ': { steps: [{ l: true }, { f: true, d: true, s: true, j: true, l: true }] }, 'ポ': { steps: [{ l: true }, { d: true, s: true, j: true, l: true }] }, 'マ': { steps: [{ f: true, s: true, k: true, l: true }] }, 'ミ': { steps: [{ f: true, d: true, s: true, k: true, l: true }] }, 'ム': { steps: [{ f: true, s: true, j: true, k: true, l: true }] }, 'メ': { steps: [{ f: true, d: true, s: true, j: true, k: true, l: true }] }, 'モ': { steps: [{ d: true, s: true, j: true, k: true, l: true }] }, 'ヤ': { steps: [{ s: true, j: true }] }, 'ユ': { steps: [{ s: true, j: true, l: true }] }, 'ヨ': { steps: [{ s: true, j: true, k: true }] }, 'ラ': { steps: [{ f: true, k: true }] }, 'リ': { steps: [{ f: true, d: true, k: true }] }, 'ル': { steps: [{ f: true, s: true, j: true }] }, 'レ': { steps: [{ f: true, d: true, j: true, k: true }] }, 'ロ': { steps: [{ d: true, j: true, k: true }] }, 'ワ': { steps: [{ s: true }] }, 'ヲ': { steps: [{ s: true, k: true }] }, 'ン': { steps: [{ s: true, k: true, l: true }] } };
+        const modePools = { 'a': ['ア', 'イ', 'ウ', 'エ', 'オ'], 'ka': ['カ', 'キ', 'ク', 'ケ', 'コ', 'ガ', 'ギ', 'グ', 'ゲ', 'ゴ'], 'sa': ['サ', 'シ', 'ス', 'セ', 'ソ', 'ザ', 'ジ', 'ズ', 'ゼ', 'ゾ'], 'ta': ['タ', 'チ', 'ツ', 'テ', 'ト', 'ダ', 'ヂ', 'ヅ', 'デ', 'ド'], 'na': ['ナ', 'ニ', 'ヌ', 'ネ', 'ノ'], 'ha': ['ハ', 'ヒ', 'フ', 'ヘ', 'ホ', 'バ', 'ビ', 'ブ', 'ベ', 'ボ', 'パ', 'ピ', 'プ', 'ペ', 'ポ'], 'ma': ['マ', 'ミ', 'ム', 'メ', 'モ'], 'ya': ['ヤ', 'ユ', 'ヨ'], 'ra': ['ラ', 'リ', 'ル', 'レ', 'ロ'], 'wa': ['ワ', 'ヲ', 'ン'] };
+
+        function toggleMode(mode, btn) { if (activeModes.has(mode)) { if (activeModes.size > 1) { activeModes.delete(mode); btn.classList.remove('selected'); } } else { activeModes.add(mode); btn.classList.add('selected'); } remainingLetters = []; }
+        function startGame() { audioCtx.resume(); document.getElementById('start-overlay').style.display = 'none'; isGameStarted = true; resetGame(); }
+        
+        function gameOver() { 
+            isGameStarted = false; 
+            if (score > highScore) { 
+                highScore = score; 
+                localStorage.setItem('brailleHighScore', highScore); 
+            }
+            document.getElementById('msg').innerText = "GAME OVER / SCORE: " + score;
+            document.getElementById('high-score-display').innerText = "HIGH SCORE: " + highScore;
+            document.getElementById('start-overlay').style.display = 'flex'; 
+        }
+
+        function resetGame() { score = 0; combo = 0; Composite.clear(engine.world, false); marblesInBowl = []; remainingLetters = []; const bowl = (function(cx, cy, r, t) { const parts = []; for (let i = 0; i <= 40; i++) { const angle = Math.PI * (i / 40); parts.push(Bodies.circle(cx + r * Math.cos(angle), cy + r * Math.sin(angle), t, { isStatic: true, friction: 0.8, restitution: 0.1, render: { visible: false } })); } return parts; })(200, 350, 150, 10); Composite.add(engine.world, bowl); resetInput(); dropMarble(); }
+        
+        function dropMarble() { 
+            if (remainingLetters.length === 0) { 
+                activeModes.forEach(m => modePools[m].forEach((char, idx) => remainingLetters.push({ char, mode: m, idx }))); 
+                remainingLetters.sort(() => Math.random() - 0.5); 
+            } 
+            let sel = remainingLetters.pop(); 
+            currentMarble = Bodies.circle(200, 30, 25, { restitution: 0.3, friction: 0.5, density: 0.01, render: { fillStyle: `hsl(${modeBaseColors[sel.mode] + (sel.idx * 5)}, 70%, 60%)`, strokeStyle: '#fff', lineWidth: 2 }, label: 'marble', text: sel.char }); 
+            currentStep = 0; 
+            Composite.add(engine.world, currentMarble); 
+        }
+        
+        function checkAnswer() { 
+            if (!isGameStarted || !currentMarble) return; 
+            const steps = brailleSteps[currentMarble.text].steps; 
+            const currentTarget = steps[currentStep]; 
+            let isMatch = true; 
+            for (let key in lockedKeys) { 
+                if (!!currentTarget[key] !== lockedKeys[key]) { isMatch = false; break; } 
+            } 
+            if (isMatch) { 
+                playCorrectSound(); 
+                currentStep++; 
+                if (currentStep >= steps.length) { 
+                    score += (10 + (combo * 5)); combo++;
+                    Body.applyForce(currentMarble, currentMarble.position, { x: (Math.random() - 0.5) * 0.8, y: -0.9 });
+                    setTimeout(() => { 
+                        if (currentMarble) { 
+                            Composite.remove(engine.world, currentMarble); 
+                            currentMarble = null; 
+                            resetInput(); 
+                            dropMarble(); 
+                        } 
+                    }, 500); 
+                } else { 
+                    resetInput(); 
+                } 
+            } else { combo = 0; resetInput(); } 
+        }
+
+        function resetInput() { for (let k in lockedKeys) lockedKeys[k] = false; }
+        window.addEventListener('keydown', (e) => { if (!isGameStarted) return; const key = e.key.toLowerCase(); if (key === 'enter' || key === ' ') { checkAnswer(); return; } if (lockedKeys.hasOwnProperty(key)) { lockedKeys[key] = !lockedKeys[key]; } });
+        Events.on(engine, 'afterUpdate', () => { if (isGameStarted && currentMarble && Body.getSpeed(currentMarble) < 0.05 && currentMarble.position.y > 200) { marblesInBowl.push(currentMarble); currentMarble = null; combo = 0; resetInput(); if (marblesInBowl.length >= 10) gameOver(); else dropMarble(); } });
+
+        Events.on(render, 'afterRender', () => {
+            const ctx = render.context;
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, 500);
+            bgGrad.addColorStop(0, '#e3f2fd'); bgGrad.addColorStop(1, '#bbdefb');
+            ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 400, 500);
+            const floorGrad = ctx.createLinearGradient(0, 350, 0, 500);
+            floorGrad.addColorStop(0, '#e1f5fe'); floorGrad.addColorStop(1, '#b3e5fc');
+            ctx.fillStyle = floorGrad; ctx.fillRect(0, 350, 400, 150);
+            ctx.beginPath(); ctx.ellipse(200, 480, 140, 20, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 50, 100, 0.15)'; ctx.fill();
+            ctx.beginPath(); ctx.ellipse(200, 350, 155, 30, 0, 0, Math.PI * 2);
+            const rimGrad = ctx.createRadialGradient(200, 340, 140, 200, 340, 165);
+            rimGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)'); rimGrad.addColorStop(1, 'rgba(180, 220, 255, 0.5)');
+            ctx.strokeStyle = rimGrad; ctx.lineWidth = 12; ctx.stroke();
+            const bowlGrad = ctx.createLinearGradient(0, 350, 0, 500);
+            bowlGrad.addColorStop(0, 'rgba(150, 200, 255, 0.3)'); bowlGrad.addColorStop(1, 'rgba(100, 160, 220, 0.5)');
+            ctx.beginPath(); ctx.arc(200, 350, 155, 0, Math.PI, false); ctx.fillStyle = bowlGrad; ctx.fill();
+
+            ctx.fillStyle = '#0277bd';
+            ctx.font = '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('f:1  d:2  s:3    j:4  k:5  l:6', 200, 470);
+
+            ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = '#0277bd'; ctx.textAlign = 'left'; 
+            ctx.fillText('SCORE: ' + score + '  COMBO: ' + combo, 20, 30);
+
+            if (currentMarble) {
+                const centerX = 200, centerY = 200, hG = 25, vG = 40;
+                const pos = { 'f': [-hG, -vG, '1'], 'd': [-hG, 0, '2'], 's': [-hG, vG, '3'], 'j': [hG, -vG, '4'], 'k': [hG, 0, '5'], 'l': [hG, vG, '6'] };
+                
+                Object.keys(pos).forEach(k => {
+                    const x = centerX + pos[k][0], y = centerY + pos[k][1];
+                    const grad = ctx.createRadialGradient(x - 3, y - 3, 2, x, y, 20);
+                    grad.addColorStop(0, lockedKeys[k] ? '#60a5fa' : '#e1f5fe');
+                    grad.addColorStop(1, lockedKeys[k] ? '#0277bd' : '#90caf9');
+                    ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.fillStyle = grad; ctx.fill();
+                    
+                    ctx.fillStyle = lockedKeys[k] ? 'rgba(255,255,255,0.8)' : 'rgba(2, 119, 189, 0.4)';
+                    ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(pos[k][2], x, y);
+                    
+                    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(x - 5, y - 5, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.stroke();
+                });
+            }
+
+            if (currentMarble) {
+                ctx.font = '60px "Noto Sans Symbols 2"'; ctx.fillStyle = '#0277bd'; ctx.fillText(brailleMap[currentMarble.text], 350, 70);
+            }
+
+            Composite.allBodies(engine.world).forEach(b => { 
+                if (b.label === 'marble' && b.text) {
+                    ctx.fillStyle = b.render.fillStyle; ctx.beginPath(); ctx.arc(b.position.x, b.position.y, 25, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(b.position.x - 8, b.position.y - 8, 8, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 20px sans-serif'; ctx.fillText(b.text, b.position.x, b.position.y);
+                }
+            });
+        });
+
+        Render.run(render); Runner.run(Runner.create(), engine);
+    </script>
+</body>
+</html>
