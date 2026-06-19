@@ -20,7 +20,8 @@
         .mode-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #01579b; }
         .mode-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #01579b; }
         .mode-btn.selected { background: #0288d1; color: white; box-shadow: 0 4px 0 #01579b; }
-        .mode-btn.selected:active { transform: translateY(2px); box-shadow: 0 2px 0 #01579b; }
+        .practice-btn { background: #ff9800; color: white; }
+        .practice-btn.selected { background: #e65100; }
         
         #game-container { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
         #start-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
@@ -40,6 +41,7 @@
         <button class="mode-btn" onclick="toggleMode('ya', this)">ヤ行</button>
         <button class="mode-btn" onclick="toggleMode('ra', this)">ラ行</button>
         <button class="mode-btn" onclick="toggleMode('wa', this)">ワ行</button>
+        <button class="mode-btn practice-btn" onclick="togglePractice(this)">練習モード</button>
     </div>
     
     <div id="game-container">
@@ -52,7 +54,7 @@
     </div>
 
     <script>
-        let score = 0, combo = 0;
+        let score = 0, combo = 0, isPractice = false;
         let highScore = localStorage.getItem('brailleHighScore') || 0;
         document.getElementById('high-score-display').innerText = "HIGH SCORE: " + highScore;
 
@@ -73,6 +75,7 @@
         const modePools = { 'a': ['ア', 'イ', 'ウ', 'エ', 'オ'], 'ka': ['カ', 'キ', 'ク', 'ケ', 'コ', 'ガ', 'ギ', 'グ', 'ゲ', 'ゴ'], 'sa': ['サ', 'シ', 'ス', 'セ', 'ソ', 'ザ', 'ジ', 'ズ', 'ゼ', 'ゾ'], 'ta': ['タ', 'チ', 'ツ', 'テ', 'ト', 'ダ', 'ヂ', 'ヅ', 'デ', 'ド'], 'na': ['ナ', 'ニ', 'ヌ', 'ネ', 'ノ'], 'ha': ['ハ', 'ヒ', 'フ', 'ヘ', 'ホ', 'バ', 'ビ', 'ブ', 'ベ', 'ボ', 'パ', 'ピ', 'プ', 'ペ', 'ポ'], 'ma': ['マ', 'ミ', 'ム', 'メ', 'モ'], 'ya': ['ヤ', 'ユ', 'ヨ'], 'ra': ['ラ', 'リ', 'ル', 'レ', 'ロ'], 'wa': ['ワ', 'ヲ', 'ン'] };
 
         function toggleMode(mode, btn) { if (activeModes.has(mode)) { if (activeModes.size > 1) { activeModes.delete(mode); btn.classList.remove('selected'); } } else { activeModes.add(mode); btn.classList.add('selected'); } remainingLetters = []; }
+        function togglePractice(btn) { isPractice = !isPractice; btn.classList.toggle('selected'); engine.world.gravity.y = isPractice ? 0.02 : 0.08; }
         function startGame() { audioCtx.resume(); document.getElementById('start-overlay').style.display = 'none'; isGameStarted = true; resetGame(); }
         
         function gameOver() { 
@@ -99,7 +102,10 @@
             Composite.add(engine.world, currentMarble); 
         }
         
-        function checkAnswer() { 
+              function resetInput() { for (let k in lockedKeys) lockedKeys[k] = false; }
+        
+       window.addEventListener('keydown', (e) => {
+    function checkAnswer() { 
             if (!isGameStarted || !currentMarble) return; 
             const steps = brailleSteps[currentMarble.text].steps; 
             const currentTarget = steps[currentStep]; 
@@ -111,7 +117,11 @@
                 playCorrectSound(); 
                 currentStep++; 
                 if (currentStep >= steps.length) { 
-                    score += (10 + (combo * 5)); combo++;
+                    // 練習モードでなければスコアとコンボを加算
+                    if (!isPractice) {
+                        score += (10 + (combo * 5));
+                        combo++;
+                    }
                     Body.applyForce(currentMarble, currentMarble.position, { x: (Math.random() - 0.5) * 0.8, y: -0.9 });
                     setTimeout(() => { 
                         if (currentMarble) { 
@@ -124,14 +134,29 @@
                 } else { 
                     resetInput(); 
                 } 
-            } else { combo = 0; resetInput(); } 
-        }
-
-        function resetInput() { for (let k in lockedKeys) lockedKeys[k] = false; }
-        window.addEventListener('keydown', (e) => { if (!isGameStarted) return; const key = e.key.toLowerCase(); if (key === 'enter' || key === ' ') { checkAnswer(); return; } if (lockedKeys.hasOwnProperty(key)) { lockedKeys[key] = !lockedKeys[key]; } });
-        Events.on(engine, 'afterUpdate', () => { if (isGameStarted && currentMarble && Body.getSpeed(currentMarble) < 0.05 && currentMarble.position.y > 200) { marblesInBowl.push(currentMarble); currentMarble = null; combo = 0; resetInput(); if (marblesInBowl.length >= 10) gameOver(); else dropMarble(); } });
-
-        Events.on(render, 'afterRender', () => {
+            } else { 
+                // 練習モードでなければコンボリセット
+                if (!isPractice) combo = 0;
+                resetInput(); 
+            } 
+        }        if (!isGameStarted) return;
+            
+            const key = e.key.toLowerCase();
+            
+            // エンターかスペースの時
+            if (key === 'enter' || key === ' ') {
+                // ボタンにフォーカスが当たっていたら強制的に外す
+                if (document.activeElement.tagName === 'BUTTON') {
+                    document.activeElement.blur();
+                }
+                checkAnswer();
+                return;
+            }
+            
+            if (lockedKeys.hasOwnProperty(key)) {
+                lockedKeys[key] = !lockedKeys[key];
+            }
+        }); Events.on(render, 'afterRender', () => {
             const ctx = render.context;
             const bgGrad = ctx.createLinearGradient(0, 0, 0, 500);
             bgGrad.addColorStop(0, '#e3f2fd'); bgGrad.addColorStop(1, '#bbdefb');
@@ -191,7 +216,6 @@
         });
 
         Render.run(render); Runner.run(Runner.create(), engine);
-   // Special thanks to Matter.js for this amazing physics engine!
     </script>
 </body>
 </html>
