@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -11,6 +11,7 @@
             background: linear-gradient(135deg, #e0f2f1, #b3e5fc); 
             min-height: 100vh; font-family: sans-serif; margin: 0; 
         }
+        /* メニュー周りの整理 */
         #menu { margin-top: 10px; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
         .mode-btn { 
             padding: 10px 20px; cursor: pointer; border: none; border-radius: 8px; 
@@ -23,6 +24,9 @@
         .practice-btn { background: #ff9800; color: white; }
         .practice-btn.selected { background: #e65100; }
         
+        /* 遊び方エリアのスタイル */
+        #how-to-area { margin: 10px; text-align: center; width: 100%; }
+        
         #game-container { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
         #start-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
         canvas { background: #fff; border: 3px solid #0277bd; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -30,17 +34,24 @@
     </style>
 </head>
 <body>
-    <div id="menu">
-<div id="how-to-area" style="margin: 10px; text-align: center;">
-    <button class="mode-btn" onclick="toggleHelp()" style="background: #4caf50;">遊び方を見る</button>
-    <div id="help-content" style="display: none; background: #fff; padding: 15px; border: 2px solid #4caf50; border-radius: 10px; margin-top: 10px; max-width: 300px; text-align: left;">
-        <p style="font-size: 0.9em;">
-            ・キーボードの <strong>f, d, s</strong>（左手）と <strong>j, k, l</strong>（右手）で点字を入力します。<br>
-            ・画面に降ってくる文字を素早く入力しよう！<br>
-            ・濁音・拗音などは、指定された順序通りにキーを押してね。
-        </p>
+
+    <div id="how-to-area">
+        <button class="mode-btn" onclick="toggleHelp()" style="background: #4caf50; color: white;">遊び方を見る</button>
+        <div id="help-content" style="display: none; background: #fff; padding: 15px; border: 2px solid #4caf50; border-radius: 10px; margin: 10px auto; max-width: 300px; text-align: left;">
+            <p style="font-size: 0.9em;">
+                ・キーボードの <strong>f, d, s</strong>（左手）と <strong>j, k, l</strong>（右手）で点字を入力します。<br>
+                ・画面に降ってくる文字を素早く入力しよう！<br>
+                ・濁音・拗音などは、指定された順序通りにキーを押してね。
+(濁音『が』の入力例
+
+１．濁音府(５の点)を入力－ｋキー→「Enter」または「Space」
+
+２．文字「か」（１．６の点）を入力－ｆキー＋ｌキー→「Enter」または「Space」 
+            </p>
+        </div>
     </div>
-</div>
+
+    <div id="menu">
         <button class="mode-btn selected" onclick="toggleMode('a', this)">ア行</button>
         <button class="mode-btn" onclick="toggleMode('ka', this)">カ・ガ</button>
         <button class="mode-btn" onclick="toggleMode('sa', this)">サ・ザ</button>
@@ -64,6 +75,12 @@
     </div>
 
     <script>
+        function toggleHelp() {
+            const content = document.getElementById('help-content');
+            content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        }
+       
+    
         let score = 0, combo = 0, isPractice = false;
         let highScore = localStorage.getItem('brailleHighScore') || 0;
         document.getElementById('high-score-display').innerText = "HIGH SCORE: " + highScore;
