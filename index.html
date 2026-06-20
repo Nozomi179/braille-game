@@ -31,6 +31,16 @@
 </head>
 <body>
     <div id="menu">
+<div id="how-to-area" style="margin: 10px; text-align: center;">
+    <button class="mode-btn" onclick="toggleHelp()" style="background: #4caf50;">遊び方を見る</button>
+    <div id="help-content" style="display: none; background: #fff; padding: 15px; border: 2px solid #4caf50; border-radius: 10px; margin-top: 10px; max-width: 300px; text-align: left;">
+        <p style="font-size: 0.9em;">
+            ・キーボードの <strong>f, d, s</strong>（左手）と <strong>j, k, l</strong>（右手）で点字を入力します。<br>
+            ・画面に降ってくる文字を素早く入力しよう！<br>
+            ・濁音・拗音などは、指定された順序通りにキーを押してね。
+        </p>
+    </div>
+</div>
         <button class="mode-btn selected" onclick="toggleMode('a', this)">ア行</button>
         <button class="mode-btn" onclick="toggleMode('ka', this)">カ・ガ</button>
         <button class="mode-btn" onclick="toggleMode('sa', this)">サ・ザ</button>
@@ -215,6 +225,14 @@
         });
 
         Render.run(render); Runner.run(Runner.create(), engine);
+function toggleHelp() {
+    const help = document.getElementById('help-content');
+    if (help.style.display === 'none') {
+        help.style.display = 'block';
+    } else {
+        help.style.display = 'none';
+    }
+}
         // Special thanks to Matter.js for this amazing physics engine!
         // https://brm.io/matter-js/
     </script>
